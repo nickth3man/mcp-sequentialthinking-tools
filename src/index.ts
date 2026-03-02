@@ -3,16 +3,21 @@
 // adapted from https://github.com/modelcontextprotocol/servers/blob/main/src/sequentialthinking/index.ts
 // for use with mcp tools
 
-import { McpServer } from 'tmcp';
-import { ValibotJsonSchemaAdapter } from '@tmcp/adapter-valibot';
-import { StdioTransport } from '@tmcp/transport-stdio';
-import * as v from 'valibot';
-import chalk from 'chalk';
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { SequentialThinkingSchema, SEQUENTIAL_THINKING_TOOL } from './schema.js';
-import { ThoughtData, ToolRecommendation, StepRecommendation, Tool } from './types.js';
+import { SEQUENTIAL_THINKING_TOOL, SEQUENTIAL_THINKING_INPUT_SCHEMA } from './tools/sequentialthinking/schema.js';
+import { BRANCH_EXPLORER_TOOL, BRANCH_EXPLORER_INPUT_SCHEMA } from './tools/branch-explorer/schema.js';
+import { ToolAwareSequentialThinkingServer } from './server/index.js';
+import { ADD_THOUGHT_TOOL, ADD_THOUGHT_INPUT_SCHEMA } from './tools/add-thought/schema.js';
+import { GET_THOUGHT_HISTORY_TOOL, GET_THOUGHT_HISTORY_INPUT_SCHEMA } from './tools/get-thought-history/schema.js';
+import { CREATE_BRANCH_TOOL, CREATE_BRANCH_INPUT_SCHEMA } from './tools/create-branch/schema.js';
+import { LIST_BRANCHES_TOOL, LIST_BRANCHES_INPUT_SCHEMA } from './tools/list-branches/schema.js';
+import { COMPARE_BRANCHES_TOOL, COMPARE_BRANCHES_INPUT_SCHEMA } from './tools/compare-branches/schema.js';
+import { RECOMMEND_BRANCH_TOOL, RECOMMEND_BRANCH_INPUT_SCHEMA } from './tools/recommend-branch/schema.js';
+import { MERGE_BRANCH_INSIGHTS_TOOL, MERGE_BRANCH_INSIGHTS_INPUT_SCHEMA } from './tools/merge-branch-insights/schema.js';
 
 // Get version from package.json
 const __filename = fileURLToPath(import.meta.url);
@@ -22,244 +27,6 @@ const package_json = JSON.parse(
 );
 const { name, version } = package_json;
 
-// Create MCP server with tmcp
-const adapter = new ValibotJsonSchemaAdapter();
-const server = new McpServer(
-	{
-		name,
-		version,
-		description: 'MCP server for Sequential Thinking Tools',
-	},
-	{
-		adapter,
-		capabilities: {
-			tools: { listChanged: true },
-		},
-	},
-);
-
-interface ServerOptions {
-	available_tools?: Tool[];
-	maxHistorySize?: number;
-}
-
-class ToolAwareSequentialThinkingServer {
-	private thought_history: ThoughtData[] = [];
-	private branches: Record<string, ThoughtData[]> = {};
-	private available_tools: Map<string, Tool> = new Map();
-	private maxHistorySize: number;
-
-	public getAvailableTools(): Tool[] {
-		return Array.from(this.available_tools.values());
-	}
-
-	constructor(options: ServerOptions = {}) {
-		this.maxHistorySize = options.maxHistorySize || 1000;
-		
-		// Always include the sequential thinking tool
-		const tools = [
-			SEQUENTIAL_THINKING_TOOL,
-			...(options.available_tools || []),
-		];
-
-		// Initialize with provided tools
-		tools.forEach((tool) => {
-			if (this.available_tools.has(tool.name)) {
-				console.error(
-					`Warning: Duplicate tool name '${tool.name}' - using first occurrence`,
-				);
-				return;
-			}
-			this.available_tools.set(tool.name, tool);
-		});
-
-		console.error(
-			'Available tools:',
-			Array.from(this.available_tools.keys()),
-		);
-	}
-
-	public clearHistory(): void {
-		this.thought_history = [];
-		this.branches = {};
-		console.error('History cleared');
-	}
-
-	public addTool(tool: Tool): void {
-		if (this.available_tools.has(tool.name)) {
-			console.error(`Warning: Tool '${tool.name}' already exists`);
-			return;
-		}
-		this.available_tools.set(tool.name, tool);
-		console.error(`Added tool: ${tool.name}`);
-	}
-
-	public discoverTools(): void {
-		// In a real implementation, this would scan the environment
-		// for available MCP tools and add them to available_tools
-		console.error('Tool discovery not implemented - manually add tools via addTool()');
-	}
-
-	private formatRecommendation(step: StepRecommendation): string {
-		const tools = step.recommended_tools
-			.map((tool) => {
-				const alternatives = tool.alternatives?.length 
-					? ` (alternatives: ${tool.alternatives.join(', ')})`
-					: '';
-				const inputs = tool.suggested_inputs 
-					? `\n    Suggested inputs: ${JSON.stringify(tool.suggested_inputs)}`
-					: '';
-				return `  - ${tool.tool_name} (priority: ${tool.priority})${alternatives}
-    Rationale: ${tool.rationale}${inputs}`;
-			})
-			.join('\n');
-
-		return `Step: ${step.step_description}
-Recommended Tools:
-${tools}
-Expected Outcome: ${step.expected_outcome}${
-			step.next_step_conditions
-				? `\nConditions for next step:\n  - ${step.next_step_conditions.join('\n  - ')}`
-				: ''
-		}`;
-	}
-
-	private formatThought(thoughtData: ThoughtData): string {
-		const {
-			thought_number,
-			total_thoughts,
-			thought,
-			is_revision,
-			revises_thought,
-			branch_from_thought,
-			branch_id,
-			current_step,
-		} = thoughtData;
-
-		let prefix = '';
-		let context = '';
-
-		if (is_revision) {
-			prefix = chalk.yellow('🔄 Revision');
-			context = ` (revising thought ${revises_thought})`;
-		} else if (branch_from_thought) {
-			prefix = chalk.green('🌿 Branch');
-			context = ` (from thought ${branch_from_thought}, ID: ${branch_id})`;
-		} else {
-			prefix = chalk.blue('💭 Thought');
-			context = '';
-		}
-
-		const header = `${prefix} ${thought_number}/${total_thoughts}${context}`;
-		let content = thought;
-
-		// Add recommendation information if present
-		if (current_step) {
-			content = `${thought}\n\nRecommendation:\n${this.formatRecommendation(current_step)}`;
-		}
-
-		const border = '─'.repeat(
-			Math.max(header.length, content.length) + 4,
-		);
-
-		return `
-┌${border}┐
-│ ${header} │
-├${border}┤
-│ ${content.padEnd(border.length - 2)} │
-└${border}┘`;
-	}
-
-	public async processThought(input: v.InferInput<typeof SequentialThinkingSchema>) {
-		try {
-			// Input is already validated by tmcp with Valibot
-			const validatedInput = input as ThoughtData;
-
-			if (
-				validatedInput.thought_number > validatedInput.total_thoughts
-			) {
-				validatedInput.total_thoughts = validatedInput.thought_number;
-			}
-
-			// Store the current step in thought history
-			if (validatedInput.current_step) {
-				if (!validatedInput.previous_steps) {
-					validatedInput.previous_steps = [];
-				}
-				validatedInput.previous_steps.push(validatedInput.current_step);
-			}
-
-			this.thought_history.push(validatedInput);
-		
-		// Prevent memory leaks by limiting history size
-		if (this.thought_history.length > this.maxHistorySize) {
-			this.thought_history = this.thought_history.slice(-this.maxHistorySize);
-			console.error(`History trimmed to ${this.maxHistorySize} items`);
-		}
-
-			if (
-				validatedInput.branch_from_thought &&
-				validatedInput.branch_id
-			) {
-				if (!this.branches[validatedInput.branch_id]) {
-					this.branches[validatedInput.branch_id] = [];
-				}
-				this.branches[validatedInput.branch_id].push(validatedInput);
-			}
-
-			const formattedThought = this.formatThought(validatedInput);
-			console.error(formattedThought);
-
-			return {
-				content: [
-					{
-						type: 'text' as const,
-						text: JSON.stringify(
-							{
-								thought_number: validatedInput.thought_number,
-								total_thoughts: validatedInput.total_thoughts,
-								next_thought_needed:
-									validatedInput.next_thought_needed,
-								branches: Object.keys(this.branches),
-								thought_history_length: this.thought_history.length,
-								available_mcp_tools: validatedInput.available_mcp_tools,
-								current_step: validatedInput.current_step,
-								previous_steps: validatedInput.previous_steps,
-								remaining_steps: validatedInput.remaining_steps,
-							},
-							null,
-							2,
-						),
-					},
-				],
-			};
-		} catch (error) {
-			return {
-				content: [
-					{
-						type: 'text' as const,
-						text: JSON.stringify(
-							{
-								error:
-									error instanceof Error
-										? error.message
-										: String(error),
-								status: 'failed',
-							},
-							null,
-							2,
-						),
-					},
-				],
-				isError: true,
-			};
-		}
-	}
-
-	// Tool execution removed - the MCP client handles tool execution
-	// This server only provides tool recommendations
-}
-
 // Read configuration from environment variables or command line args
 const maxHistorySize = parseInt(process.env.MAX_HISTORY_SIZE || '1000');
 
@@ -268,21 +35,125 @@ const thinkingServer = new ToolAwareSequentialThinkingServer({
 	maxHistorySize,
 });
 
-// Register the sequential thinking tool
-server.tool(
+// Create MCP server with official SDK
+const server = new McpServer(
 	{
-		name: 'sequentialthinking_tools',
-		description: SEQUENTIAL_THINKING_TOOL.description,
-		schema: SequentialThinkingSchema,
+		name,
+		version,
 	},
-	async (input) => {
+);
+
+// Register the sequential thinking tool
+server.registerTool(
+	'sequentialthinking_tools',
+	{
+		description: SEQUENTIAL_THINKING_TOOL.description,
+		inputSchema: SEQUENTIAL_THINKING_INPUT_SCHEMA,
+	},
+	async (input: Parameters<ToolAwareSequentialThinkingServer['processThought']>[0]) => {
 		return thinkingServer.processThought(input);
 	},
 );
 
+// Register the branch explorer tool
+server.registerTool(
+	'branch_explorer',
+	{
+		description: BRANCH_EXPLORER_TOOL.description,
+		inputSchema: BRANCH_EXPLORER_INPUT_SCHEMA,
+	},
+	async (input: Parameters<ToolAwareSequentialThinkingServer['processBranchExplorer']>[0]) => {
+		return thinkingServer.processBranchExplorer(input);
+	},
+);
+
+// Register the add_thought tool
+server.registerTool(
+	'add_thought',
+	{
+		description: ADD_THOUGHT_TOOL.description,
+		inputSchema: ADD_THOUGHT_INPUT_SCHEMA,
+	},
+	async (input: Parameters<ToolAwareSequentialThinkingServer['addThought']>[0]) => {
+		return thinkingServer.addThought(input);
+	},
+);
+
+// Register the get_thought_history tool
+server.registerTool(
+	'get_thought_history',
+	{
+		description: GET_THOUGHT_HISTORY_TOOL.description,
+		inputSchema: GET_THOUGHT_HISTORY_INPUT_SCHEMA,
+	},
+	async (input: Parameters<ToolAwareSequentialThinkingServer['getThoughtHistory']>[0]) => {
+		return thinkingServer.getThoughtHistory(input);
+	},
+);
+
+// Register the create_branch tool
+server.registerTool(
+	'create_branch',
+	{
+		description: CREATE_BRANCH_TOOL.description,
+		inputSchema: CREATE_BRANCH_INPUT_SCHEMA,
+	},
+	async (input: Parameters<ToolAwareSequentialThinkingServer['createBranch']>[0]) => {
+		return thinkingServer.createBranch(input);
+	},
+);
+
+// Register the list_branches tool
+server.registerTool(
+	'list_branches',
+	{
+		description: LIST_BRANCHES_TOOL.description,
+		inputSchema: LIST_BRANCHES_INPUT_SCHEMA,
+	},
+	async (input: Parameters<ToolAwareSequentialThinkingServer['listBranches']>[0]) => {
+		return thinkingServer.listBranches(input);
+	},
+);
+
+// Register the compare_branches tool
+server.registerTool(
+	'compare_branches',
+	{
+		description: COMPARE_BRANCHES_TOOL.description,
+		inputSchema: COMPARE_BRANCHES_INPUT_SCHEMA,
+	},
+	async (input: Parameters<ToolAwareSequentialThinkingServer['compareBranches']>[0]) => {
+		return thinkingServer.compareBranches(input);
+	},
+);
+
+// Register the recommend_branch tool
+server.registerTool(
+	'recommend_branch',
+	{
+		description: RECOMMEND_BRANCH_TOOL.description,
+		inputSchema: RECOMMEND_BRANCH_INPUT_SCHEMA,
+	},
+	async (input: Parameters<ToolAwareSequentialThinkingServer['recommendBranch']>[0]) => {
+		return thinkingServer.recommendBranch(input);
+	},
+);
+
+// Register the merge_branch_insights tool
+server.registerTool(
+	'merge_branch_insights',
+	{
+		description: MERGE_BRANCH_INSIGHTS_TOOL.description,
+		inputSchema: MERGE_BRANCH_INSIGHTS_INPUT_SCHEMA,
+	},
+	async (input: Parameters<ToolAwareSequentialThinkingServer['mergeBranchInsights']>[0]) => {
+		return thinkingServer.mergeBranchInsights(input);
+	},
+);
+
 async function main() {
-	const transport = new StdioTransport(server);
-	transport.listen();
+	const transport = new StdioServerTransport();
+	await server.connect(transport);
 	console.error('Sequential Thinking MCP Server running on stdio');
 }
 
