@@ -17,9 +17,12 @@ import { recommendBranch } from '../tools/recommend-branch/index.js';
 import { RecommendBranchInput } from '../tools/recommend-branch/types.js';
 import { mergeBranchInsights } from '../tools/merge-branch-insights/index.js';
 import { MergeBranchInsightsInput } from '../tools/merge-branch-insights/types.js';
+import { checkMemoryPressure } from '../tools/shared/index.js';
+
 interface ServerOptions {
 	available_tools?: Tool[];
 	maxHistorySize?: number;
+	maxHeapBytes?: number;
 }
 
 export class ToolAwareSequentialThinkingServer {
@@ -27,6 +30,7 @@ export class ToolAwareSequentialThinkingServer {
 	private branches: Record<string, ThoughtData[]> = {};
 	private available_tools: Map<string, Tool> = new Map();
 	private maxHistorySize: number;
+	private maxHeapBytes: number;
 
 	public getAvailableTools(): Tool[] {
 		return Array.from(this.available_tools.values());
@@ -34,11 +38,10 @@ export class ToolAwareSequentialThinkingServer {
 
 	constructor(options: ServerOptions = {}) {
 		this.maxHistorySize = options.maxHistorySize || 1000;
-		
+		this.maxHeapBytes = options.maxHeapBytes || 512 * 1024 * 1024;
+
 		// Always include the sequential thinking tool
-		const tools = [
-			...(options.available_tools || []),
-		];
+		const tools = [...(options.available_tools || [])];
 
 		// Initialize with provided tools
 		tools.forEach((tool) => {
@@ -75,10 +78,15 @@ export class ToolAwareSequentialThinkingServer {
 	public discoverTools(): void {
 		// In a real implementation, this would scan the environment
 		// for available MCP tools and add them to available_tools
-		console.error('Tool discovery not implemented - manually add tools via addTool()');
+		console.error(
+			'Tool discovery not implemented - manually add tools via addTool()',
+		);
 	}
 
-	public async processThought(input: Parameters<typeof processThought>[0]) {
+	public async processThought(
+		input: Parameters<typeof processThought>[0],
+	) {
+		checkMemoryPressure({ maxHeapBytes: this.maxHeapBytes });
 		return processThought(input, {
 			thought_history: this.thought_history,
 			branches: this.branches,
@@ -96,6 +104,7 @@ export class ToolAwareSequentialThinkingServer {
 	}
 
 	public async addThought(input: AddThoughtInput) {
+		checkMemoryPressure({ maxHeapBytes: this.maxHeapBytes });
 		return addThought(input, {
 			thought_history: this.thought_history,
 			branches: this.branches,
@@ -110,6 +119,7 @@ export class ToolAwareSequentialThinkingServer {
 	}
 
 	public async createBranch(input: CreateBranchInput) {
+		checkMemoryPressure({ maxHeapBytes: this.maxHeapBytes });
 		return createBranch(input, {
 			thought_history: this.thought_history,
 			branches: this.branches,

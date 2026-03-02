@@ -8,16 +8,43 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { SEQUENTIAL_THINKING_TOOL, SEQUENTIAL_THINKING_INPUT_SCHEMA } from './tools/sequentialthinking/schema.js';
-import { BRANCH_EXPLORER_TOOL, BRANCH_EXPLORER_INPUT_SCHEMA } from './tools/branch-explorer/schema.js';
+import {
+	SEQUENTIAL_THINKING_TOOL,
+	SEQUENTIAL_THINKING_INPUT_SCHEMA,
+} from './tools/sequentialthinking/schema.js';
+import {
+	BRANCH_EXPLORER_TOOL,
+	BRANCH_EXPLORER_INPUT_SCHEMA,
+} from './tools/branch-explorer/schema.js';
 import { ToolAwareSequentialThinkingServer } from './server/index.js';
-import { ADD_THOUGHT_TOOL, ADD_THOUGHT_INPUT_SCHEMA } from './tools/add-thought/schema.js';
-import { GET_THOUGHT_HISTORY_TOOL, GET_THOUGHT_HISTORY_INPUT_SCHEMA } from './tools/get-thought-history/schema.js';
-import { CREATE_BRANCH_TOOL, CREATE_BRANCH_INPUT_SCHEMA } from './tools/create-branch/schema.js';
-import { LIST_BRANCHES_TOOL, LIST_BRANCHES_INPUT_SCHEMA } from './tools/list-branches/schema.js';
-import { COMPARE_BRANCHES_TOOL, COMPARE_BRANCHES_INPUT_SCHEMA } from './tools/compare-branches/schema.js';
-import { RECOMMEND_BRANCH_TOOL, RECOMMEND_BRANCH_INPUT_SCHEMA } from './tools/recommend-branch/schema.js';
-import { MERGE_BRANCH_INSIGHTS_TOOL, MERGE_BRANCH_INSIGHTS_INPUT_SCHEMA } from './tools/merge-branch-insights/schema.js';
+import {
+	ADD_THOUGHT_TOOL,
+	ADD_THOUGHT_INPUT_SCHEMA,
+} from './tools/add-thought/schema.js';
+import {
+	GET_THOUGHT_HISTORY_TOOL,
+	GET_THOUGHT_HISTORY_INPUT_SCHEMA,
+} from './tools/get-thought-history/schema.js';
+import {
+	CREATE_BRANCH_TOOL,
+	CREATE_BRANCH_INPUT_SCHEMA,
+} from './tools/create-branch/schema.js';
+import {
+	LIST_BRANCHES_TOOL,
+	LIST_BRANCHES_INPUT_SCHEMA,
+} from './tools/list-branches/schema.js';
+import {
+	COMPARE_BRANCHES_TOOL,
+	COMPARE_BRANCHES_INPUT_SCHEMA,
+} from './tools/compare-branches/schema.js';
+import {
+	RECOMMEND_BRANCH_TOOL,
+	RECOMMEND_BRANCH_INPUT_SCHEMA,
+} from './tools/recommend-branch/schema.js';
+import {
+	MERGE_BRANCH_INSIGHTS_TOOL,
+	MERGE_BRANCH_INSIGHTS_INPUT_SCHEMA,
+} from './tools/merge-branch-insights/schema.js';
 
 // Get version from package.json
 const __filename = fileURLToPath(import.meta.url);
@@ -29,19 +56,21 @@ const { name, version } = package_json;
 
 // Read configuration from environment variables or command line args
 const maxHistorySize = parseInt(process.env.MAX_HISTORY_SIZE || '1000');
+const maxHeapBytes = parseInt(
+	process.env.MAX_HEAP_BYTES || '536870912',
+); // Default 512MB
 
 const thinkingServer = new ToolAwareSequentialThinkingServer({
 	available_tools: [], // TODO: Add tool discovery mechanism
 	maxHistorySize,
+	maxHeapBytes,
 });
 
 // Create MCP server with official SDK
-const server = new McpServer(
-	{
-		name,
-		version,
-	},
-);
+const server = new McpServer({
+	name,
+	version,
+});
 
 // Register the sequential thinking tool
 server.registerTool(
@@ -50,7 +79,11 @@ server.registerTool(
 		description: SEQUENTIAL_THINKING_TOOL.description,
 		inputSchema: SEQUENTIAL_THINKING_INPUT_SCHEMA,
 	},
-	async (input: Parameters<ToolAwareSequentialThinkingServer['processThought']>[0]) => {
+	async (
+		input: Parameters<
+			ToolAwareSequentialThinkingServer['processThought']
+		>[0],
+	) => {
 		return thinkingServer.processThought(input);
 	},
 );
@@ -62,7 +95,11 @@ server.registerTool(
 		description: BRANCH_EXPLORER_TOOL.description,
 		inputSchema: BRANCH_EXPLORER_INPUT_SCHEMA,
 	},
-	async (input: Parameters<ToolAwareSequentialThinkingServer['processBranchExplorer']>[0]) => {
+	async (
+		input: Parameters<
+			ToolAwareSequentialThinkingServer['processBranchExplorer']
+		>[0],
+	) => {
 		return thinkingServer.processBranchExplorer(input);
 	},
 );
@@ -74,7 +111,11 @@ server.registerTool(
 		description: ADD_THOUGHT_TOOL.description,
 		inputSchema: ADD_THOUGHT_INPUT_SCHEMA,
 	},
-	async (input: Parameters<ToolAwareSequentialThinkingServer['addThought']>[0]) => {
+	async (
+		input: Parameters<
+			ToolAwareSequentialThinkingServer['addThought']
+		>[0],
+	) => {
 		return thinkingServer.addThought(input);
 	},
 );
@@ -86,7 +127,11 @@ server.registerTool(
 		description: GET_THOUGHT_HISTORY_TOOL.description,
 		inputSchema: GET_THOUGHT_HISTORY_INPUT_SCHEMA,
 	},
-	async (input: Parameters<ToolAwareSequentialThinkingServer['getThoughtHistory']>[0]) => {
+	async (
+		input: Parameters<
+			ToolAwareSequentialThinkingServer['getThoughtHistory']
+		>[0],
+	) => {
 		return thinkingServer.getThoughtHistory(input);
 	},
 );
@@ -98,7 +143,11 @@ server.registerTool(
 		description: CREATE_BRANCH_TOOL.description,
 		inputSchema: CREATE_BRANCH_INPUT_SCHEMA,
 	},
-	async (input: Parameters<ToolAwareSequentialThinkingServer['createBranch']>[0]) => {
+	async (
+		input: Parameters<
+			ToolAwareSequentialThinkingServer['createBranch']
+		>[0],
+	) => {
 		return thinkingServer.createBranch(input);
 	},
 );
@@ -110,7 +159,11 @@ server.registerTool(
 		description: LIST_BRANCHES_TOOL.description,
 		inputSchema: LIST_BRANCHES_INPUT_SCHEMA,
 	},
-	async (input: Parameters<ToolAwareSequentialThinkingServer['listBranches']>[0]) => {
+	async (
+		input: Parameters<
+			ToolAwareSequentialThinkingServer['listBranches']
+		>[0],
+	) => {
 		return thinkingServer.listBranches(input);
 	},
 );
@@ -122,7 +175,11 @@ server.registerTool(
 		description: COMPARE_BRANCHES_TOOL.description,
 		inputSchema: COMPARE_BRANCHES_INPUT_SCHEMA,
 	},
-	async (input: Parameters<ToolAwareSequentialThinkingServer['compareBranches']>[0]) => {
+	async (
+		input: Parameters<
+			ToolAwareSequentialThinkingServer['compareBranches']
+		>[0],
+	) => {
 		return thinkingServer.compareBranches(input);
 	},
 );
@@ -134,7 +191,11 @@ server.registerTool(
 		description: RECOMMEND_BRANCH_TOOL.description,
 		inputSchema: RECOMMEND_BRANCH_INPUT_SCHEMA,
 	},
-	async (input: Parameters<ToolAwareSequentialThinkingServer['recommendBranch']>[0]) => {
+	async (
+		input: Parameters<
+			ToolAwareSequentialThinkingServer['recommendBranch']
+		>[0],
+	) => {
 		return thinkingServer.recommendBranch(input);
 	},
 );
@@ -146,7 +207,11 @@ server.registerTool(
 		description: MERGE_BRANCH_INSIGHTS_TOOL.description,
 		inputSchema: MERGE_BRANCH_INSIGHTS_INPUT_SCHEMA,
 	},
-	async (input: Parameters<ToolAwareSequentialThinkingServer['mergeBranchInsights']>[0]) => {
+	async (
+		input: Parameters<
+			ToolAwareSequentialThinkingServer['mergeBranchInsights']
+		>[0],
+	) => {
 		return thinkingServer.mergeBranchInsights(input);
 	},
 );
