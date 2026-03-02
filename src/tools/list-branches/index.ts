@@ -1,19 +1,17 @@
 import chalk from 'chalk';
 import { BranchStatistics } from '../branch-explorer/types.js';
 import { ThoughtData } from '../sequentialthinking/types.js';
+import { formatErrorResponse } from '../shared/error.js';
 import { ListBranchesInput } from './types.js';
 
-/**
- * Compute statistics for a single branch
- */
 function computeBranchStats(branchId: string, thoughts: ThoughtData[]): BranchStatistics {
 	const firstThought = thoughts[0];
 	const lastThought = thoughts[thoughts.length - 1];
-	const revisionCount = thoughts.filter(t => t.is_revision).length;
+	const revisionCount = thoughts.filter((t) => t.is_revision).length;
 	const totalExpected = lastThought.total_thoughts || thoughts.length;
 	const completionPercentage = (thoughts.length / totalExpected) * 100;
 
-	const uniqueSteps = new Set(thoughts.map(t => t.thought_number)).size;
+	const uniqueSteps = new Set(thoughts.map((t) => t.thought_number)).size;
 	const depthScore = uniqueSteps > 0 ? thoughts.length / uniqueSteps : 0;
 
 	return {
@@ -27,14 +25,11 @@ function computeBranchStats(branchId: string, thoughts: ThoughtData[]): BranchSt
 	};
 }
 
-/**
- * List all branches with statistics, optionally filtered by completion threshold
- */
 export async function listBranches(
 	input: ListBranchesInput,
 	context: {
 		branches: Record<string, ThoughtData[]>;
-	}
+	},
 ): Promise<{
 	content: Array<{ type: 'text'; text: string }>;
 	isError?: boolean;
@@ -47,14 +42,16 @@ export async function listBranches(
 
 			const branchStats = computeBranchStats(branchId, thoughts);
 
-			if (input.min_completion_threshold !== undefined && branchStats.completion_percentage < input.min_completion_threshold) {
+			if (
+				input.min_completion_threshold !== undefined &&
+				branchStats.completion_percentage < input.min_completion_threshold
+			) {
 				continue;
 			}
 
 			stats.push(branchStats);
 		}
 
-		// Sort by completion percentage descending
 		stats.sort((a, b) => b.completion_percentage - a.completion_percentage);
 
 		const result = {
@@ -65,21 +62,14 @@ export async function listBranches(
 		console.error(chalk.cyan('📋 List Branches:'), JSON.stringify(result, null, 2));
 
 		return {
-			content: [{
-				type: 'text' as const,
-				text: JSON.stringify(result, null, 2),
-			}],
+			content: [
+				{
+					type: 'text' as const,
+					text: JSON.stringify(result, null, 2),
+				},
+			],
 		};
 	} catch (error) {
-		return {
-			content: [{
-				type: 'text' as const,
-				text: JSON.stringify({
-					error: error instanceof Error ? error.message : String(error),
-					status: 'failed',
-				}, null, 2),
-			}],
-			isError: true,
-		};
+		return formatErrorResponse(error);
 	}
 }

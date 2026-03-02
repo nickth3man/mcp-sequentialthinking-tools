@@ -5,15 +5,13 @@ import {
 	BranchExplorerInput,
 } from './types.js';
 import { ThoughtData } from '../sequentialthinking/types.js';
+import { formatErrorResponse } from '../shared/error.js';
 
-/**
- * Process a branch explorer action
- */
 export async function processBranchExplorer(
 	input: BranchExplorerInput,
 	context: {
 		branches: Record<string, ThoughtData[]>;
-	}
+	},
 ): Promise<{
 	content: Array<{ type: 'text'; text: string }>;
 	isError?: boolean;
@@ -44,35 +42,27 @@ export async function processBranchExplorer(
 				throw new Error(`Unknown action: ${input.action}`);
 		}
 
-		// Log to stderr for visibility
-		console.error(chalk.cyan(`🔀 Branch Explorer (${input.action}):`), JSON.stringify(result, null, 2));
+		console.error(
+			chalk.cyan(`🔀 Branch Explorer (${input.action}):`),
+			JSON.stringify(result, null, 2),
+		);
 
 		return {
-			content: [{
-				type: 'text' as const,
-				text: JSON.stringify(result, null, 2),
-			}],
+			content: [
+				{
+					type: 'text' as const,
+					text: JSON.stringify(result, null, 2),
+				},
+			],
 		};
 	} catch (error) {
-		return {
-			content: [{
-				type: 'text' as const,
-				text: JSON.stringify({
-					error: error instanceof Error ? error.message : String(error),
-					status: 'failed',
-				}, null, 2),
-			}],
-			isError: true,
-		};
+		return formatErrorResponse(error);
 	}
 }
 
-/**
- * List branches with optional filtering
- */
 function listBranches(
 	branches: Record<string, ThoughtData[]>,
-	minCompletionThreshold?: number
+	minCompletionThreshold?: number,
 ): BranchStatistics[] {
 	const stats: BranchStatistics[] = [];
 
@@ -81,19 +71,21 @@ function listBranches(
 
 		const firstThought = thoughts[0];
 		const lastThought = thoughts[thoughts.length - 1];
-		const revisionCount = thoughts.filter(t => t.is_revision).length;
+		const revisionCount = thoughts.filter((t) => t.is_revision).length;
 		const totalExpected = lastThought.total_thoughts || thoughts.length;
 		const completionProgress = firstThought.branch_from_thought
 			? thoughts.length
 			: lastThought.thought_number;
 		const completionPercentage = (completionProgress / totalExpected) * 100;
 
-		if (minCompletionThreshold !== undefined && completionPercentage < minCompletionThreshold) {
+		if (
+			minCompletionThreshold !== undefined &&
+			completionPercentage < minCompletionThreshold
+		) {
 			continue;
 		}
 
-		// Calculate depth score (thoughts per unique step)
-		const uniqueSteps = new Set(thoughts.map(t => t.thought_number)).size;
+		const uniqueSteps = new Set(thoughts.map((t) => t.thought_number)).size;
 		const depthScore = uniqueSteps > 0 ? thoughts.length / uniqueSteps : 0;
 
 		stats.push({
@@ -107,20 +99,16 @@ function listBranches(
 		});
 	}
 
-	// Sort by completion percentage descending
 	return stats.sort((a, b) => b.completion_percentage - a.completion_percentage);
 }
 
-/**
- * Compare multiple branches
- */
 function compareBranches(
 	branches: Record<string, ThoughtData[]>,
-	branchIds: string[]
+	branchIds: string[],
 ): BranchComparison {
 	const branchThoughts = branchIds
-		.map(id => branches[id])
-		.filter(thoughts => thoughts && thoughts.length > 0);
+		.map((id) => branches[id])
+		.filter((thoughts) => thoughts && thoughts.length > 0);
 
 	if (branchThoughts.length === 0) {
 		return {
@@ -130,11 +118,14 @@ function compareBranches(
 		};
 	}
 
-	const stats = listBranches(branches).filter(stat => branchIds.includes(stat.branch_id));
+	const stats = listBranches(branches).filter((stat) =>
+		branchIds.includes(stat.branch_id),
+	);
 	const bestBranch = stats.reduce((best, current) => {
-		// Score based on completion, depth, and fewer revisions
-		const currentScore = current.completion_percentage + (current.depth_score * 10) - (current.revision_count * 5);
-		const bestScore = best.completion_percentage + (best.depth_score * 10) - (best.revision_count * 5);
+		const currentScore =
+			current.completion_percentage + current.depth_score * 10 - current.revision_count * 5;
+		const bestScore =
+			best.completion_percentage + best.depth_score * 10 - best.revision_count * 5;
 		return currentScore > bestScore ? current : best;
 	});
 
@@ -146,9 +137,6 @@ function compareBranches(
 	};
 }
 
-/**
- * Recommend the best branch to pursue
- */
 function recommendBranch(branches: Record<string, ThoughtData[]>): BranchComparison {
 	const allStats = listBranches(branches);
 
@@ -156,7 +144,8 @@ function recommendBranch(branches: Record<string, ThoughtData[]>): BranchCompari
 		return {
 			branches: [],
 			recommendation: 'No branches available',
-			reasoning: 'Create branches first using branch_from_thought in your thinking process',
+			reasoning:
+				'Create branches first using branch_from_thought in your thinking process',
 		};
 	}
 
@@ -170,15 +159,12 @@ function recommendBranch(branches: Record<string, ThoughtData[]>): BranchCompari
 		};
 	}
 
-	return compareBranches(branches, allStats.map(s => s.branch_id));
+	return compareBranches(branches, allStats.map((s) => s.branch_id));
 }
 
-/**
- * Merge insights from multiple branches
- */
 function mergeInsights(
 	branches: Record<string, ThoughtData[]>,
-	branchIds?: string[]
+	branchIds?: string[],
 ): { insights: string[]; synthesis: string } {
 	const ids = branchIds || Object.keys(branches);
 	const allThoughts: ThoughtData[] = [];
@@ -188,15 +174,13 @@ function mergeInsights(
 		if (branchThoughts) {
 			allThoughts.push(...branchThoughts);
 		}
-
 	}
 
-	// Extract unique insights from thoughts
 	const insights = allThoughts
-		.filter(t => t.thought && t.thought.trim().length > 5)
-		.map(t => t.thought)
-		.filter((value, index, self) => self.indexOf(value) === index) // deduplicate
-		.slice(0, 10); // limit to 10 insights
+		.filter((t) => t.thought && t.thought.trim().length > 5)
+		.map((t) => t.thought)
+		.filter((value, index, self) => self.indexOf(value) === index)
+		.slice(0, 10);
 
 	const synthesis = `Merged insights from ${ids.length} branch(es) with ${allThoughts.length} total thoughts. Key themes include ${insights.length > 0 ? 'identified insights' : 'ongoing exploration'}.`;
 

@@ -1,19 +1,17 @@
 import chalk from 'chalk';
 import { BranchComparison, BranchStatistics } from '../branch-explorer/types.js';
 import { ThoughtData } from '../sequentialthinking/types.js';
+import { formatErrorResponse } from '../shared/error.js';
 import { RecommendBranchInput, RecommendBranchResult } from './types.js';
 
-/**
- * Compute statistics for a single branch
- */
 function computeBranchStats(branchId: string, thoughts: ThoughtData[]): BranchStatistics {
 	const firstThought = thoughts[0];
 	const lastThought = thoughts[thoughts.length - 1];
-	const revisionCount = thoughts.filter(t => t.is_revision).length;
+	const revisionCount = thoughts.filter((t) => t.is_revision).length;
 	const totalExpected = lastThought.total_thoughts || thoughts.length;
 	const completionPercentage = (thoughts.length / totalExpected) * 100;
 
-	const uniqueSteps = new Set(thoughts.map(t => t.thought_number)).size;
+	const uniqueSteps = new Set(thoughts.map((t) => t.thought_number)).size;
 	const depthScore = uniqueSteps > 0 ? thoughts.length / uniqueSteps : 0;
 
 	return {
@@ -27,22 +25,15 @@ function computeBranchStats(branchId: string, thoughts: ThoughtData[]): BranchSt
 	};
 }
 
-/**
- * Calculate recommendation score for a branch
- * Score = completion_percentage + (depth_score * 10) - (revision_count * 5)
- */
 function calculateScore(stats: BranchStatistics): number {
-	return stats.completion_percentage + (stats.depth_score * 10) - (stats.revision_count * 5);
+	return stats.completion_percentage + stats.depth_score * 10 - stats.revision_count * 5;
 }
 
-/**
- * Recommend the best branch to continue working on
- */
 export async function recommendBranch(
 	_input: RecommendBranchInput,
 	context: {
 		branches: Record<string, ThoughtData[]>;
-	}
+	},
 ): Promise<RecommendBranchResult> {
 	try {
 		const branches: BranchStatistics[] = [];
@@ -54,7 +45,6 @@ export async function recommendBranch(
 			branches.push(branchStats);
 		}
 
-		// Handle empty branches case
 		if (branches.length === 0) {
 			const result: BranchComparison = {
 				branches: [],
@@ -65,15 +55,16 @@ export async function recommendBranch(
 			console.error(chalk.yellow('⚠️ Recommend Branch:'), 'No branches available');
 
 			return {
-				content: [{
-					type: 'text' as const,
-					text: JSON.stringify(result, null, 2),
-				}],
+				content: [
+					{
+						type: 'text' as const,
+						text: JSON.stringify(result, null, 2),
+					},
+				],
 			};
 		}
 
-		// Sort by score descending to find best branch
-		const scoredBranches = branches.map(b => ({
+		const scoredBranches = branches.map((b) => ({
 			...b,
 			score: calculateScore(b),
 		}));
@@ -90,21 +81,14 @@ export async function recommendBranch(
 		console.error(chalk.cyan('⭐ Recommend Branch:'), JSON.stringify(comparison, null, 2));
 
 		return {
-			content: [{
-				type: 'text' as const,
-				text: JSON.stringify(comparison, null, 2),
-			}],
+			content: [
+				{
+					type: 'text' as const,
+					text: JSON.stringify(comparison, null, 2),
+				},
+			],
 		};
 	} catch (error) {
-		return {
-			content: [{
-				type: 'text' as const,
-				text: JSON.stringify({
-					error: error instanceof Error ? error.message : String(error),
-					status: 'failed',
-				}, null, 2),
-			}],
-			isError: true,
-		};
+		return formatErrorResponse(error);
 	}
 }
