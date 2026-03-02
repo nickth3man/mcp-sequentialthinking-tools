@@ -1,5 +1,4 @@
-import * as v from 'valibot';
-import { Tool } from './types.js';
+import { z } from 'zod/v4';
 
 const TOOL_DESCRIPTION = `A detailed tool for dynamic and reflective problem-solving through thoughts.
 This tool helps analyze problems through a flexible thinking process that can adapt and evolve.
@@ -74,115 +73,40 @@ You should:
 14. Provide a single, ideally correct answer as the final output
 15. Only set next_thought_needed to false when truly done and a satisfactory answer is reached`;
 
-export const ToolRecommendationSchema = v.object({
-	tool_name: v.pipe(
-		v.string(),
-		v.description('Name of the tool being recommended')
-	),
-	confidence: v.pipe(
-		v.number(),
-		v.minValue(0),
-		v.maxValue(1),
-		v.description('0-1 indicating confidence in recommendation')
-	),
-	rationale: v.pipe(
-		v.string(),
-		v.description('Why this tool is recommended')
-	),
-	priority: v.pipe(
-		v.number(),
-		v.description('Order in the recommendation sequence')
-	),
-	suggested_inputs: v.optional(v.pipe(
-		v.record(v.string(), v.unknown()),
-		v.description('Optional suggested parameters')
-	)),
-	alternatives: v.optional(v.pipe(
-		v.array(v.string()),
-		v.description('Alternative tools that could be used')
-	))
+export const ToolRecommendationZodSchema = z.object({
+	tool_name: z.string().describe('Name of the tool being recommended'),
+	confidence: z.number().min(0).max(1).describe('0-1 indicating confidence in recommendation'),
+	rationale: z.string().describe('Why this tool is recommended'),
+	priority: z.number().describe('Order in the recommendation sequence'),
+	suggested_inputs: z.record(z.string(), z.unknown()).optional().describe('Optional suggested parameters'),
+	alternatives: z.array(z.string()).optional().describe('Alternative tools that could be used'),
 });
 
-export const StepRecommendationSchema = v.object({
-	step_description: v.pipe(
-		v.string(),
-		v.description('What needs to be done')
-	),
-	recommended_tools: v.pipe(
-		v.array(ToolRecommendationSchema),
-		v.description('Tools recommended for this step')
-	),
-	expected_outcome: v.pipe(
-		v.string(),
-		v.description('What to expect from this step')
-	),
-	next_step_conditions: v.optional(v.pipe(
-		v.array(v.string()),
-		v.description('Conditions to consider for the next step')
-	))
+export const StepRecommendationZodSchema = z.object({
+	step_description: z.string().describe('What needs to be done'),
+	recommended_tools: z.array(ToolRecommendationZodSchema).describe('Tools recommended for this step'),
+	expected_outcome: z.string().describe('What to expect from this step'),
+	next_step_conditions: z.array(z.string()).optional().describe('Conditions to consider for the next step'),
 });
 
-export const SequentialThinkingSchema = v.object({
-	available_mcp_tools: v.pipe(
-		v.array(v.string()),
-		v.description('Array of MCP tool names available for use (e.g., ["mcp-omnisearch", "mcp-turso-cloud"])')
-	),
-	thought: v.pipe(
-		v.string(),
-		v.description('Your current thinking step')
-	),
-	next_thought_needed: v.pipe(
-		v.boolean(),
-		v.description('Whether another thought step is needed')
-	),
-	thought_number: v.pipe(
-		v.number(),
-		v.minValue(1),
-		v.description('Current thought number')
-	),
-	total_thoughts: v.pipe(
-		v.number(),
-		v.minValue(1),
-		v.description('Estimated total thoughts needed')
-	),
-	is_revision: v.optional(v.pipe(
-		v.boolean(),
-		v.description('Whether this revises previous thinking')
-	)),
-	revises_thought: v.optional(v.pipe(
-		v.number(),
-		v.minValue(1),
-		v.description('Which thought is being reconsidered')
-	)),
-	branch_from_thought: v.optional(v.pipe(
-		v.number(),
-		v.minValue(1),
-		v.description('Branching point thought number')
-	)),
-	branch_id: v.optional(v.pipe(
-		v.string(),
-		v.description('Branch identifier')
-	)),
-	needs_more_thoughts: v.optional(v.pipe(
-		v.boolean(),
-		v.description('If more thoughts are needed')
-	)),
-	current_step: v.optional(v.pipe(
-		StepRecommendationSchema,
-		v.description('Current step recommendation')
-	)),
-	previous_steps: v.optional(v.pipe(
-		v.array(StepRecommendationSchema),
-		v.description('Steps already recommended')
-	)),
-	remaining_steps: v.optional(v.pipe(
-		v.array(v.string()),
-		v.description('High-level descriptions of upcoming steps')
-	))
+// Full z.object() schema for use as registerTool inputSchema
+export const SEQUENTIAL_THINKING_INPUT_SCHEMA = z.object({
+	available_mcp_tools: z.array(z.string()).describe('Array of MCP tool names available for use (e.g., ["mcp-omnisearch", "mcp-turso-cloud"])'),
+	thought: z.string().describe('Your current thinking step'),
+	next_thought_needed: z.boolean().describe('Whether another thought step is needed'),
+	thought_number: z.number().int().min(1).describe('Current thought number'),
+	total_thoughts: z.number().int().min(1).describe('Estimated total thoughts needed'),
+	is_revision: z.boolean().optional().describe('Whether this revises previous thinking'),
+	revises_thought: z.number().int().min(1).optional().describe('Which thought is being reconsidered'),
+	branch_from_thought: z.number().int().min(1).optional().describe('Branching point thought number'),
+	branch_id: z.string().optional().describe('Branch identifier'),
+	needs_more_thoughts: z.boolean().optional().describe('If more thoughts are needed'),
+	current_step: StepRecommendationZodSchema.optional().describe('Current step recommendation'),
+	previous_steps: z.array(StepRecommendationZodSchema).optional().describe('Steps already recommended'),
+	remaining_steps: z.array(z.string()).optional().describe('High-level descriptions of upcoming steps'),
 });
 
-export const SEQUENTIAL_THINKING_TOOL: Tool = {
+export const SEQUENTIAL_THINKING_TOOL = {
 	name: 'sequentialthinking_tools',
 	description: TOOL_DESCRIPTION,
-	inputSchema: {} // This will be handled by tmcp with the schema above
 };
