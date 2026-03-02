@@ -16,6 +16,7 @@ export async function processThought(
 		thought_history: ThoughtData[];
 		branches: Record<string, ThoughtData[]>;
 		maxHistorySize: number;
+		maxBranchSize: number;
 	},
 ): Promise<{
 	content: Array<{ type: 'text'; text: string }>;
@@ -37,14 +38,20 @@ export async function processThought(
 		const previousLength = context.thought_history.length;
 		trimHistory(context.thought_history, context.maxHistorySize);
 		if (previousLength > context.maxHistorySize) {
-			console.error(`History trimmed to ${context.maxHistorySize} items`);
+			console.error(
+				`History trimmed to ${context.maxHistorySize} items`,
+			);
 		}
 
 		if (input.branch_from_thought && input.branch_id) {
 			if (!context.branches[input.branch_id]) {
 				context.branches[input.branch_id] = [];
 			}
-			context.branches[input.branch_id].push(input);
+			const branch = context.branches[input.branch_id];
+			if (branch.length >= context.maxBranchSize) {
+				throw new Error(`Branch '${input.branch_id}' has reached maximum size (${context.maxBranchSize})`);
+			}
+			branch.push(input);
 		}
 
 		const formattedThought = formatThought(input);

@@ -32,7 +32,7 @@ export const BRANCH_EXPLORER_INPUT_SCHEMA = z.object({
 		z.literal('recommend'),
 		z.literal('merge_insights'),
 	]).describe('The action to perform: list, compare, recommend, or merge_insights'),
-	branch_ids: z.array(z.string()).optional().describe('Specific branch IDs to compare (for compare action)'),
+	branch_ids: z.array(z.string().max(256)).max(100).optional().describe('Specific branch IDs to compare (for compare action)'),
 	min_completion_threshold: z.number().min(0).max(100).optional().describe('Minimum completion percentage to include (0-100)'),
 });
 

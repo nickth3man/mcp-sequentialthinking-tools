@@ -26,7 +26,7 @@ Returns:
 - Reasoning explaining the recommendation`;
 
 export const COMPARE_BRANCHES_INPUT_SCHEMA = z.object({
-	branch_ids: z.array(z.string()).min(2, 'At least 2 branch_ids are required for comparison'),
+	branch_ids: z.array(z.string().max(256)).min(2, 'At least 2 branch_ids are required for comparison').max(100),
 });
 
 export const COMPARE_BRANCHES_TOOL = {

@@ -19,8 +19,8 @@ Features:
 
 export const CREATE_BRANCH_INPUT_SCHEMA = z.object({
 	thought_number: z.number().int().min(1).describe('The thought number to branch from'),
-	branch_id: z.string().min(1).describe('Unique identifier for the new branch'),
-	thought: z.string().optional().describe('Optional initial thought content for the branch'),
+	branch_id: z.string().min(1).max(256).describe('Unique identifier for the new branch'),
+	thought: z.string().max(100000).optional().describe('Optional initial thought content for the branch'),
 });
 
 export const CREATE_BRANCH_TOOL = {

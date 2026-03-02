@@ -10,6 +10,7 @@ export async function createBranch(
 	context: {
 		thought_history: ThoughtData[];
 		branches: Record<string, ThoughtData[]>;
+		maxBranches: number;
 	},
 ): Promise<{
 	content: Array<{ type: 'text'; text: string }>;
@@ -22,6 +23,10 @@ export async function createBranch(
 
 		if (!sourceThought) {
 			throw new Error(`Thought number ${input.thought_number} not found in history`);
+		}
+
+		if (Object.keys(context.branches).length >= context.maxBranches) {
+			throw new Error(`Maximum number of branches (${context.maxBranches}) reached`);
 		}
 
 		if (context.branches[input.branch_id] !== undefined) {

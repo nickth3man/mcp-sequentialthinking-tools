@@ -74,36 +74,36 @@ You should:
 15. Only set next_thought_needed to false when truly done and a satisfactory answer is reached`;
 
 export const ToolRecommendationZodSchema = z.object({
-	tool_name: z.string().describe('Name of the tool being recommended'),
+	tool_name: z.string().max(256).describe('Name of the tool being recommended'),
 	confidence: z.number().min(0).max(1).describe('0-1 indicating confidence in recommendation'),
-	rationale: z.string().describe('Why this tool is recommended'),
+	rationale: z.string().max(10000).describe('Why this tool is recommended'),
 	priority: z.number().describe('Order in the recommendation sequence'),
-	suggested_inputs: z.record(z.string(), z.unknown()).optional().describe('Optional suggested parameters'),
-	alternatives: z.array(z.string()).optional().describe('Alternative tools that could be used'),
+	suggested_inputs: z.record(z.string().max(256), z.unknown()).optional().describe('Optional suggested parameters'),
+	alternatives: z.array(z.string().max(256)).max(100).optional().describe('Alternative tools that could be used'),
 });
 
 export const StepRecommendationZodSchema = z.object({
-	step_description: z.string().describe('What needs to be done'),
-	recommended_tools: z.array(ToolRecommendationZodSchema).describe('Tools recommended for this step'),
-	expected_outcome: z.string().describe('What to expect from this step'),
-	next_step_conditions: z.array(z.string()).optional().describe('Conditions to consider for the next step'),
+	step_description: z.string().max(10000).describe('What needs to be done'),
+	recommended_tools: z.array(ToolRecommendationZodSchema).max(100).describe('Tools recommended for this step'),
+	expected_outcome: z.string().max(10000).describe('What to expect from this step'),
+	next_step_conditions: z.array(z.string().max(1000)).max(100).optional().describe('Conditions to consider for the next step'),
 });
 
 // Full z.object() schema for use as registerTool inputSchema
 export const SEQUENTIAL_THINKING_INPUT_SCHEMA = z.object({
-	available_mcp_tools: z.array(z.string()).describe('Array of MCP tool names available for use (e.g., ["mcp-omnisearch", "mcp-turso-cloud"])'),
-	thought: z.string().describe('Your current thinking step'),
+	available_mcp_tools: z.array(z.string().max(256)).max(1000).describe('Array of MCP tool names available for use (e.g., ["mcp-omnisearch", "mcp-turso-cloud"])'),
+	thought: z.string().max(100000).describe('Your current thinking step'),
 	next_thought_needed: z.boolean().describe('Whether another thought step is needed'),
 	thought_number: z.number().int().min(1).describe('Current thought number'),
 	total_thoughts: z.number().int().min(1).describe('Estimated total thoughts needed'),
 	is_revision: z.boolean().optional().describe('Whether this revises previous thinking'),
 	revises_thought: z.number().int().min(1).optional().describe('Which thought is being reconsidered'),
 	branch_from_thought: z.number().int().min(1).optional().describe('Branching point thought number'),
-	branch_id: z.string().optional().describe('Branch identifier'),
+	branch_id: z.string().max(256).optional().describe('Branch identifier'),
 	needs_more_thoughts: z.boolean().optional().describe('If more thoughts are needed'),
 	current_step: StepRecommendationZodSchema.optional().describe('Current step recommendation'),
-	previous_steps: z.array(StepRecommendationZodSchema).optional().describe('Steps already recommended'),
-	remaining_steps: z.array(z.string()).optional().describe('High-level descriptions of upcoming steps'),
+	previous_steps: z.array(StepRecommendationZodSchema).max(1000).optional().describe('Steps already recommended'),
+	remaining_steps: z.array(z.string().max(1000)).max(1000).optional().describe('High-level descriptions of upcoming steps'),
 });
 
 export const SEQUENTIAL_THINKING_TOOL = {

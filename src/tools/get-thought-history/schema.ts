@@ -22,7 +22,7 @@ Features:
 export const GET_THOUGHT_HISTORY_INPUT_SCHEMA = z.object({
 	limit: z.number().int().min(1).max(1000).optional().describe('Maximum number of thoughts to return (default: all)'),
 	offset: z.number().int().min(0).optional().describe('Number of thoughts to skip (default: 0)'),
-	branch_id: z.string().optional().describe('Filter to thoughts with specific branch_id'),
+	branch_id: z.string().max(256).optional().describe('Filter to thoughts with specific branch_id'),
 	include_revisions: z.boolean().optional().describe('Include revision thoughts (default: true)'),
 	include_branch_info: z.boolean().optional().describe('Include branch metadata in results (default: true)'),
 	reverse: z.boolean().optional().describe('Return in reverse chronological order (default: false)'),

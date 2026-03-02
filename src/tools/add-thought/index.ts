@@ -1,10 +1,14 @@
 import { z } from 'zod/v4';
 import chalk from 'chalk';
-import { ThoughtData, StepRecommendation } from '../sequentialthinking/types.js';
+import {
+	ThoughtData,
+	StepRecommendation,
+} from '../sequentialthinking/types.js';
 import { trimHistory } from '../shared/history.js';
 import { ADD_THOUGHT_INPUT_SCHEMA } from './schema.js';
 import { formatThought } from '../formatters/thought.js';
 import { formatErrorResponse } from '../shared/error.js';
+import { sanitizeBranchId } from '../shared/sanitize.js';
 
 type AddThoughtInput = z.infer<typeof ADD_THOUGHT_INPUT_SCHEMA>;
 
@@ -17,7 +21,8 @@ export async function addThought(
 		thought_history: ThoughtData[];
 		branches: Record<string, ThoughtData[]>;
 		maxHistorySize: number;
-	}
+		maxBranchSize: number;
+	},
 ): Promise<{
 	content: Array<{ type: 'text'; text: string }>;
 	isError?: boolean;
@@ -25,7 +30,9 @@ export async function addThought(
 	try {
 		const validatedInput = input;
 
-		if (validatedInput.thought_number > validatedInput.total_thoughts) {
+		if (
+			validatedInput.thought_number > validatedInput.total_thoughts
+		) {
 			validatedInput.total_thoughts = validatedInput.thought_number;
 		}
 
@@ -42,15 +49,27 @@ export async function addThought(
 		// Prevent memory leaks by limiting history size
 		trimHistory(context.thought_history, context.maxHistorySize);
 		if (context.thought_history.length > context.maxHistorySize) {
-			context.thought_history = context.thought_history.slice(-context.maxHistorySize);
-			console.error(`History trimmed to ${context.maxHistorySize} items`);
+			context.thought_history = context.thought_history.slice(
+				-context.maxHistorySize,
+			);
+			console.error(
+				`History trimmed to ${context.maxHistorySize} items`,
+			);
 		}
 
-		if (validatedInput.branch_from_thought && validatedInput.branch_id) {
-			if (!context.branches[validatedInput.branch_id]) {
-				context.branches[validatedInput.branch_id] = [];
+		if (
+			validatedInput.branch_from_thought &&
+			validatedInput.branch_id
+		) {
+			const branchId = sanitizeBranchId(validatedInput.branch_id);
+			if (!context.branches[branchId]) {
+				context.branches[branchId] = [];
 			}
-			context.branches[validatedInput.branch_id].push(validatedInput);
+			const branch = context.branches[branchId];
+			if (branch.length >= context.maxBranchSize) {
+				throw new Error(`Branch '${branchId}' has reached maximum size (${context.maxBranchSize})`);
+			}
+			branch.push(validatedInput);
 		}
 
 		const formattedThought = formatThought(validatedInput);
@@ -73,7 +92,7 @@ export async function addThought(
 							remaining_steps: validatedInput.remaining_steps,
 						},
 						null,
-						2
+						2,
 					),
 				},
 			],

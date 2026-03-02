@@ -7,6 +7,7 @@ describe('addThought', () => {
 		thought_history: ThoughtData[];
 		branches: Record<string, ThoughtData[]>;
 		maxHistorySize: number;
+		maxBranchSize: number;
 	};
 
 	beforeEach(() => {
@@ -14,6 +15,7 @@ describe('addThought', () => {
 			thought_history: [],
 			branches: {},
 			maxHistorySize: 1000,
+			maxBranchSize: 500,
 		};
 	});
 

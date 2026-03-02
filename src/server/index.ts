@@ -18,10 +18,13 @@ import { RecommendBranchInput } from '../tools/recommend-branch/types.js';
 import { mergeBranchInsights } from '../tools/merge-branch-insights/index.js';
 import { MergeBranchInsightsInput } from '../tools/merge-branch-insights/types.js';
 import { checkMemoryPressure } from '../tools/shared/index.js';
+import { AsyncMutex } from '../tools/shared/mutex.js';
 
 interface ServerOptions {
 	available_tools?: Tool[];
 	maxHistorySize?: number;
+	maxBranches?: number;
+	maxBranchSize?: number;
 	maxHeapBytes?: number;
 }
 
@@ -29,8 +32,11 @@ export class ToolAwareSequentialThinkingServer {
 	private thought_history: ThoughtData[] = [];
 	private branches: Record<string, ThoughtData[]> = {};
 	private available_tools: Map<string, Tool> = new Map();
-	private maxHistorySize: number;
-	private maxHeapBytes: number;
+	private readonly maxHistorySize: number;
+	private readonly maxBranches: number;
+	private readonly maxBranchSize: number;
+	private readonly maxHeapBytes: number;
+	private stateLock = new AsyncMutex();
 
 	public getAvailableTools(): Tool[] {
 		return Array.from(this.available_tools.values());
@@ -38,6 +44,8 @@ export class ToolAwareSequentialThinkingServer {
 
 	constructor(options: ServerOptions = {}) {
 		this.maxHistorySize = options.maxHistorySize || 1000;
+		this.maxBranches = options.maxBranches || 100;
+		this.maxBranchSize = options.maxBranchSize || 500;
 		this.maxHeapBytes = options.maxHeapBytes || 512 * 1024 * 1024;
 
 		// Always include the sequential thinking tool
@@ -87,10 +95,13 @@ export class ToolAwareSequentialThinkingServer {
 		input: Parameters<typeof processThought>[0],
 	) {
 		checkMemoryPressure({ maxHeapBytes: this.maxHeapBytes });
-		return processThought(input, {
-			thought_history: this.thought_history,
-			branches: this.branches,
-			maxHistorySize: this.maxHistorySize,
+		return this.stateLock.runExclusive(async () => {
+			return processThought(input, {
+				thought_history: this.thought_history,
+				branches: this.branches,
+				maxHistorySize: this.maxHistorySize,
+				maxBranchSize: this.maxBranchSize,
+			});
 		});
 	}
 
@@ -105,10 +116,13 @@ export class ToolAwareSequentialThinkingServer {
 
 	public async addThought(input: AddThoughtInput) {
 		checkMemoryPressure({ maxHeapBytes: this.maxHeapBytes });
-		return addThought(input, {
-			thought_history: this.thought_history,
-			branches: this.branches,
-			maxHistorySize: this.maxHistorySize,
+		return this.stateLock.runExclusive(async () => {
+			return addThought(input, {
+				thought_history: this.thought_history,
+				branches: this.branches,
+				maxHistorySize: this.maxHistorySize,
+				maxBranchSize: this.maxBranchSize,
+			});
 		});
 	}
 
@@ -120,9 +134,12 @@ export class ToolAwareSequentialThinkingServer {
 
 	public async createBranch(input: CreateBranchInput) {
 		checkMemoryPressure({ maxHeapBytes: this.maxHeapBytes });
-		return createBranch(input, {
-			thought_history: this.thought_history,
-			branches: this.branches,
+		return this.stateLock.runExclusive(async () => {
+			return createBranch(input, {
+				thought_history: this.thought_history,
+				branches: this.branches,
+				maxBranches: this.maxBranches,
+			});
 		});
 	}
 
@@ -145,8 +162,10 @@ export class ToolAwareSequentialThinkingServer {
 	}
 
 	public async mergeBranchInsights(input: MergeBranchInsightsInput) {
-		return mergeBranchInsights(input, {
-			branches: this.branches,
+		return this.stateLock.runExclusive(async () => {
+			return mergeBranchInsights(input, {
+				branches: this.branches,
+			});
 		});
 	}
 }

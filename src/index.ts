@@ -59,11 +59,15 @@ const maxHistorySize = parseInt(process.env.MAX_HISTORY_SIZE || '1000');
 const maxHeapBytes = parseInt(
 	process.env.MAX_HEAP_BYTES || '536870912',
 ); // Default 512MB
+const maxBranches = parseInt(process.env.MAX_BRANCHES || '100');
+const maxBranchSize = parseInt(process.env.MAX_BRANCH_SIZE || '500');
 
 const thinkingServer = new ToolAwareSequentialThinkingServer({
 	available_tools: [], // TODO: Add tool discovery mechanism
 	maxHistorySize,
 	maxHeapBytes,
+	maxBranches,
+	maxBranchSize,
 });
 
 // Create MCP server with official SDK

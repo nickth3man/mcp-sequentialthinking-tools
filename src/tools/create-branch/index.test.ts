@@ -6,6 +6,7 @@ describe('createBranch', () => {
 	let context: {
 		thought_history: ThoughtData[];
 		branches: Record<string, ThoughtData[]>;
+		maxBranches: number;
 	};
 
 	beforeEach(() => {
@@ -27,6 +28,7 @@ describe('createBranch', () => {
 				},
 			],
 			branches: {},
+			maxBranches: 100,
 		};
 	});
 
