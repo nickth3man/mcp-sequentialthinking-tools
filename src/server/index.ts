@@ -19,6 +19,16 @@ import { mergeBranchInsights } from '../tools/merge-branch-insights/index.js';
 import { MergeBranchInsightsInput } from '../tools/merge-branch-insights/types.js';
 import { checkMemoryPressure } from '../tools/shared/index.js';
 import { AsyncMutex } from '../tools/shared/mutex.js';
+import { searchThoughts } from '../tools/search-thoughts/index.js';
+import { SearchThoughtsInput } from '../tools/search-thoughts/types.js';
+import { validateThinking } from '../tools/validate-thinking/index.js';
+import { ValidateThinkingInput } from '../tools/validate-thinking/types.js';
+import { summarizeThoughts } from '../tools/summarize-thoughts/index.js';
+import { SummarizeThoughtsInput } from '../tools/summarize-thoughts/types.js';
+import { trackConstraints } from '../tools/track-constraints/index.js';
+import { TrackConstraintsInput } from '../tools/track-constraints/types.js';
+import { extractActionItems } from '../tools/extract-action-items/index.js';
+import { ExtractActionItemsInput } from '../tools/extract-action-items/types.js';
 
 interface ServerOptions {
 	available_tools?: Tool[];
@@ -32,6 +42,14 @@ export class ToolAwareSequentialThinkingServer {
 	private thought_history: ThoughtData[] = [];
 	private branches: Record<string, ThoughtData[]> = {};
 	private available_tools: Map<string, Tool> = new Map();
+	private constraints: Map<string, {
+		constraint_id: string;
+		description: string;
+		type: string;
+		priority: string;
+		status: string;
+		thought_number?: number;
+	}> = new Map();
 	private readonly maxHistorySize: number;
 	private readonly maxBranches: number;
 	private readonly maxBranchSize: number;
@@ -166,6 +184,39 @@ export class ToolAwareSequentialThinkingServer {
 			return mergeBranchInsights(input, {
 				branches: this.branches,
 			});
+		});
+	}
+
+	public async searchThoughts(input: SearchThoughtsInput) {
+		return searchThoughts(input, {
+			thought_history: this.thought_history,
+			branches: this.branches,
+		});
+	}
+
+	public async validateThinking(input: ValidateThinkingInput) {
+		return validateThinking(input, {
+			thought_history: this.thought_history,
+		});
+	}
+
+	public async summarizeThoughts(input: SummarizeThoughtsInput) {
+		return summarizeThoughts(input, {
+			thought_history: this.thought_history,
+			branches: this.branches,
+		});
+	}
+
+	public async trackConstraints(input: TrackConstraintsInput) {
+		return trackConstraints(input, {
+			constraints: this.constraints,
+		});
+	}
+
+	public async extractActionItems(input: ExtractActionItemsInput) {
+		return extractActionItems(input, {
+			thought_history: this.thought_history,
+			branches: this.branches,
 		});
 	}
 }

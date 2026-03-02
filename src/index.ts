@@ -45,6 +45,26 @@ import {
 	MERGE_BRANCH_INSIGHTS_TOOL,
 	MERGE_BRANCH_INSIGHTS_INPUT_SCHEMA,
 } from './tools/merge-branch-insights/schema.js';
+import {
+	SEARCH_THOUGHTS_TOOL,
+	SEARCH_THOUGHTS_INPUT_SCHEMA,
+} from './tools/search-thoughts/schema.js';
+import {
+	VALIDATE_THINKING_TOOL,
+	VALIDATE_THINKING_INPUT_SCHEMA,
+} from './tools/validate-thinking/schema.js';
+import {
+	SUMMARIZE_THOUGHTS_TOOL,
+	SUMMARIZE_THOUGHTS_INPUT_SCHEMA,
+} from './tools/summarize-thoughts/schema.js';
+import {
+	TRACK_CONSTRAINTS_TOOL,
+	TRACK_CONSTRAINTS_INPUT_SCHEMA,
+} from './tools/track-constraints/schema.js';
+import {
+	EXTRACT_ACTION_ITEMS_TOOL,
+	EXTRACT_ACTION_ITEMS_INPUT_SCHEMA,
+} from './tools/extract-action-items/schema.js';
 
 // Get version from package.json
 const __filename = fileURLToPath(import.meta.url);
@@ -217,6 +237,86 @@ server.registerTool(
 		>[0],
 	) => {
 		return thinkingServer.mergeBranchInsights(input);
+	},
+);
+
+// Register the search_thoughts tool
+server.registerTool(
+	'search_thoughts',
+	{
+		description: SEARCH_THOUGHTS_TOOL.description,
+		inputSchema: SEARCH_THOUGHTS_INPUT_SCHEMA,
+	},
+	async (
+		input: Parameters<
+			ToolAwareSequentialThinkingServer['searchThoughts']
+		>[0],
+	) => {
+		return thinkingServer.searchThoughts(input);
+	},
+);
+
+// Register the validate_thinking tool
+server.registerTool(
+	'validate_thinking',
+	{
+		description: VALIDATE_THINKING_TOOL.description,
+		inputSchema: VALIDATE_THINKING_INPUT_SCHEMA,
+	},
+	async (
+		input: Parameters<
+			ToolAwareSequentialThinkingServer['validateThinking']
+		>[0],
+	) => {
+		return thinkingServer.validateThinking(input);
+	},
+);
+
+// Register the summarize_thoughts tool
+server.registerTool(
+	'summarize_thoughts',
+	{
+		description: SUMMARIZE_THOUGHTS_TOOL.description,
+		inputSchema: SUMMARIZE_THOUGHTS_INPUT_SCHEMA,
+	},
+	async (
+		input: Parameters<
+			ToolAwareSequentialThinkingServer['summarizeThoughts']
+		>[0],
+	) => {
+		return thinkingServer.summarizeThoughts(input);
+	},
+);
+
+// Register the track_constraints tool
+server.registerTool(
+	'track_constraints',
+	{
+		description: TRACK_CONSTRAINTS_TOOL.description,
+		inputSchema: TRACK_CONSTRAINTS_INPUT_SCHEMA,
+	},
+	async (
+		input: Parameters<
+			ToolAwareSequentialThinkingServer['trackConstraints']
+		>[0],
+	) => {
+		return thinkingServer.trackConstraints(input);
+	},
+);
+
+// Register the extract_action_items tool
+server.registerTool(
+	'extract_action_items',
+	{
+		description: EXTRACT_ACTION_ITEMS_TOOL.description,
+		inputSchema: EXTRACT_ACTION_ITEMS_INPUT_SCHEMA,
+	},
+	async (
+		input: Parameters<
+			ToolAwareSequentialThinkingServer['extractActionItems']
+		>[0],
+	) => {
+		return thinkingServer.extractActionItems(input);
 	},
 );
 
